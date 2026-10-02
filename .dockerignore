@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-server
+.git
+.bolt
+*.md
+eslint.config.js

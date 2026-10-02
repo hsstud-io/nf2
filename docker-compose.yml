@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-nfe_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nfe_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-nfe_db}
+    networks:
+      - notafiscalbaixar_backend
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -h localhost -p 5432 -U ${POSTGRES_USER:-nfe_user} -d ${POSTGRES_DB:-nfe_db}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  nfe-manager:
+    build: .
+    ports:
+      - "4000:4000"
+    networks:
+      - notafiscalbaixar_backend
+      - front_etl_network
+    environment:
+      - PORT=4000
+      - AMBIENTE=1
+      - SYNC_CRON=0 */2 * * *
+      - DATABASE_URL=postgres://${POSTGRES_USER:-nfe_user}:${POSTGRES_PASSWORD:-nfe_pass}@postgres:5432/${POSTGRES_DB:-nfe_db}
+      - FILES_DIR=/app/dados/nfe
+    volumes:
+      - ${FILES_DIR:-/opt/nfe-dados}:/app/dados/nfe
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    
+networks:
+  notafiscalbaixar_backend:
+    driver: bridge
+    
+  front_etl_network:
+    external: true
+    name: front_etl_network
+
+volumes:
+  postgres_data:
